@@ -1,32 +1,43 @@
 
-var tile = {
-    WATER: 0,
-    DIRT: 1,
-    GRILL: 2,
-    SAUS: function(direction) {}
-};
-
-var dir = {
-    UP: 0,
-    RIGHT: 1,
-    DOWN: 2,
-    LEFT: 3,
-};
-
-var orient = {
-    VERTICAL: 0,
-    HORIZONTAL: 1,
-};
-
 var failed = false;
+var currentLevel = 0;
+
+var state;
+var stateStack;
 
 var title = document.getElementById('title');
 var ogTitleText = title.textContent;
 var subtitle = document.getElementById('subtitle');
 var ogSubtitleText = subtitle.textContent;
 
+var prevLevelButton = document.getElementById('prev-level');
+prevLevelButton.onclick = prevLevel;
+
+var nextLevelButton = document.getElementById('next-level');
+nextLevelButton.onclick = nextLevel;
+
+var levelName = document.getElementById('level-name');
+
+updateLevelButtons();
+
 var canvas = document.getElementById('canvas');
 var context = canvas.getContext('2d');
+
+loadCurrentLevel();
+resizeCanvas();
+updateSizeAttributes();
+
+document.getElementById('body').onresize = function() {
+    resizeCanvas();
+    updateSizeAttributes();
+    redraw();
+}
+
+function resizeCanvas() {
+    let canvasScale = Math.min((innerWidth - 100) / 1620, (innerHeight - 340) / 1080);
+    canvas.style.width = (canvas.width = Math.floor(1620 * canvasScale)) + "px";
+    canvas.style.height = (canvas.height = Math.floor(1080 * canvasScale)) + "px";
+}
 
 function worldToScreenPos(position) {
     return {
@@ -42,11 +53,25 @@ function vectorSum(vector1, vector2) {
     }
 }
 
-var tileSize = 80;
-var tileMargin = 10;
-var sausagePadding = 10;
-var grilledPadding = 10;
-var playerPadding = 10;
+var tileSize;
+var tileMargin;
+var sausagePadding;
+var grilledPadding;
+var playerPadding;
+var lineWidth;
+var forkLineWidth;
+
+function updateSizeAttributes() {
+    let horizontalTileSize = canvas.width / ((state.level[0].length + 2) * 9/8);
+    let verticalTileSize = canvas.height / ((state.level.length + 2) * 9/8);
+    tileSize = Math.min(horizontalTileSize, verticalTileSize);
+    tileMargin = tileSize / 8;
+    sausagePadding = tileSize / 8;
+    grilledPadding = tileSize / 8;
+    playerPadding = tileSize / 8;
+    lineWidth = tileSize / 16;
+    forkLineWidth = tileSize / 7;
+}
 
 function tileToWorldPos(x, y) {
     let tileTopLeft = {
@@ -59,11 +84,21 @@ function tileToWorldPos(x, y) {
     };
 }
 
+function tileIsWater(x, y) {
+    if (x < 0 || x >= state.level[0].length) {
+        return true;
+    }
+    if (y < 0 || y >= state.level.length) {
+        return true;
+    }
+    return state.level[y][x] === tile.WATER;
+}
+
 function drawDirt(x, y) {
 
     context.fillStyle = '#b3634d';
     context.strokeStyle = '#6b3f44';
-    context.lineWidth = '5';
+    context.lineWidth = lineWidth;
 
     let worldPosition = tileToWorldPos(x, y);
     let screenPosition = worldToScreenPos(worldPosition);
@@ -74,7 +109,7 @@ function drawDirt(x, y) {
 function drawGrill(x, y) {
     context.fillStyle = '#ffc951';
     context.strokeStyle = '#4c364a';
-    context.lineWidth = '5';
+    context.lineWidth = lineWidth;
 
     let worldPosition = tileToWorldPos(x, y);
     let screenPosition = worldToScreenPos(worldPosition);
@@ -110,7 +145,7 @@ function drawSausage(x, y, orientation, grilled) {
         screenPosition.w = tileSize - 2 * sausagePadding;
         screenPosition.h = 2 * tileSize + tileMargin - 2 * sausagePadding;
         context.fillStyle = grilled[2] ? '#5c0f00' : '#a13126';
-        context.fillRect(screenPosition.x, screenPosition.y, screenPosition.w, screenPosition.h / 2);
+        context.fillRect(screenPosition.x, screenPosition.y, screenPosition.w, (screenPosition.h / 2) * 1.01);
         context.fillStyle = grilled[3] ? '#5c0f00' : '#a13126';
         context.fillRect(screenPosition.x, screenPosition.y + screenPosition.h / 2,
             screenPosition.w, screenPosition.h / 2);
@@ -118,7 +153,7 @@ function drawSausage(x, y, orientation, grilled) {
         screenPosition.w = 2 * tileSize + tileMargin - 2 * sausagePadding;
         screenPosition.h = tileSize - 2 * sausagePadding;
         context.fillStyle = grilled[2] ? '#5c0f00' : '#a13126';
-        context.fillRect(screenPosition.x, screenPosition.y, screenPosition.w / 2, screenPosition.h);
+        context.fillRect(screenPosition.x, screenPosition.y, (screenPosition.w / 2) * 1.01, screenPosition.h);
         context.fillStyle = grilled[3] ? '#5c0f00' : '#a13126';
         context.fillRect(screenPosition.x + screenPosition.w / 2, screenPosition.y,
             screenPosition.w / 2, screenPosition.h);
@@ -137,7 +172,7 @@ function drawSausage(x, y, orientation, grilled) {
     }
 
     context.fillStyle = grilled[0] ? '#5c0f00' : '#a13126';
-    context.fillRect(grilledPosition.x, grilledPosition.y, grilledPosition.w, grilledPosition.h);
+    context.fillRect(grilledPosition.x, grilledPosition.y, grilledPosition.w * 1.01, grilledPosition.h * 1.01);
 
     if (orientation === orient.VERTICAL) {
         grilledPosition.y += grilledPosition.h;
@@ -147,7 +182,7 @@ function drawSausage(x, y, orientation, grilled) {
     context.fillStyle = grilled[1] ? '#5c0f00' : '#a13126';
     context.fillRect(grilledPosition.x, grilledPosition.y, grilledPosition.w, grilledPosition.h);
 
-    context.lineWidth = '5';
+    context.lineWidth = lineWidth;
     context.strokeStyle = '#7c1a0f';
     context.strokeRect(screenPosition.x, screenPosition.y, screenPosition.w, screenPosition.h);
 }
@@ -177,7 +212,7 @@ function drawPlayerFork(screenPosition, direction) {
         }
     ];
 
-    context.lineWidth = '12';
+    context.lineWidth = forkLineWidth;
     context.strokeStyle = '#412c2e';
 
     for (let piece of pieces) {
@@ -205,7 +240,7 @@ function drawPlayer(x, y, direction) {
 
     context.fillStyle = '#f27614';
     context.strokeStyle = '#9d3d07';
-    context.lineWidth = '5';
+    context.lineWidth = lineWidth;
 
     context.fillRect(
         playerPadding + screenPosition.x, playerPadding + screenPosition.y,
@@ -243,30 +278,6 @@ function copyState(fromState) {
     return toState;
 }
 
-var startState = {
-    level: [
-        [ tile.WATER, tile.WATER, tile.WATER, tile.WATER, tile.WATER, tile.WATER ],
-        [ tile.WATER, tile.GRILL, tile.DIRT,  tile.DIRT,  tile.GRILL, tile.WATER ],
-        [ tile.WATER, tile.GRILL, tile.DIRT,  tile.DIRT,  tile.DIRT,  tile.WATER ],
-        [ tile.WATER, tile.WATER, tile.DIRT,  tile.DIRT,  tile.DIRT,  tile.WATER ],
-        [ tile.WATER, tile.DIRT,  tile.DIRT,  tile.WATER, tile.WATER, tile.WATER ],
-        [ tile.WATER, tile.WATER, tile.WATER, tile.WATER, tile.WATER, tile.WATER ],
-    ],
-    sausages: [
-        { orient: orient.VERTICAL, pos: { x: 2, y: 1 }},
-    ],
-    player: { dir: dir.UP, pos: { x: 3, y: 3 }, },
-};
-
-startState.sausages = startState.sausages.map(function(sausage) {
-    sausage.grilled = [ false, false, false, false ];
-    return sausage;
-});
-
-var state = copyState(startState);
-
-var stateStack = [];
-
 function redraw() {
     context.clearRect(0, 0, canvas.width, canvas.height);
     for (let i = 0; i < state.level.length; i++) {
@@ -303,7 +314,7 @@ function pushSausages(position, pushVector, stateChanged) {
         }
         if (pushed) {
             stateChanged.changed = true;
-            sausage.pos = vectorSum(sausage.pos, pushVector);
+            let nextSausagePos = vectorSum(sausage.pos, pushVector);
             if ((sausage.orient === orient.VERTICAL && pushVector.x != 0) ||
                     (sausage.orient === orient.HORIZONTAL && pushVector.y != 0)) {
                 let temp = sausage.grilled[0];
@@ -312,39 +323,48 @@ function pushSausages(position, pushVector, stateChanged) {
                 temp = sausage.grilled[1];
                 sausage.grilled[1] = sausage.grilled[3];
                 sausage.grilled[3] = temp;
+                pushSausages(nextSausagePos, pushVector, stateChanged);
+            } else {
+                let nextPushPos = vectorSum(nextSausagePos, pushVector);
+                pushSausages(nextPushPos, pushVector, stateChanged);
             }
-            if (state.level[sausage.pos.y][sausage.pos.x] === tile.GRILL) {
-                if (sausage.grilled[2]) {
-                    failedLevel('You burnt a sausage!!');
-                }
-                sausage.grilled[2] = true;
-                checkSolved();
-            }
-            if (sausage.orient === orient.VERTICAL &&
-                    state.level[sausage.pos.y + 1][sausage.pos.x] === tile.GRILL) {
-                if (sausage.grilled[3]) {
-                    failedLevel('You burnt a sausage!!');
-                }
-                sausage.grilled[3] = true;
-                checkSolved();
-            }
-            if (sausage.orient === orient.HORIZONTAL &&
-                    state.level[sausage.pos.y][sausage.pos.x + 1] === tile.GRILL) {
-                if (sausage.grilled[3]) {
-                    failedLevel('You burnt a sausage!!');
-                }
-                sausage.grilled[3] = true;
-                checkSolved();
-            }
-            let mainWater = state.level[sausage.pos.y][sausage.pos.x] === tile.WATER;
-            let verticalWater = sausage.orient === orient.VERTICAL &&
-                state.level[sausage.pos.y + 1][sausage.pos.x] === tile.WATER;
-            let horizontalWater = sausage.orient === orient.HORIZONTAL &&
-                state.level[sausage.pos.y][sausage.pos.x + 1] === tile.WATER;
-            if (mainWater && (verticalWater || horizontalWater)) {
-                failedLevel('A sausage fell into the water!!');
-            }
+            sausage.pos = nextSausagePos;
+            updateSausage(sausage);
         }
+    }
+}
+
+function updateSausage(sausage) {
+    let mainWater = tileIsWater(sausage.pos.x, sausage.pos.y);
+    let verticalWater = sausage.orient === orient.VERTICAL &&
+        tileIsWater(sausage.pos.x, sausage.pos.y + 1);
+    let horizontalWater = sausage.orient === orient.HORIZONTAL &&
+        tileIsWater(sausage.pos.x + 1, sausage.pos.y);
+    if (mainWater && (verticalWater || horizontalWater)) {
+        failedLevel('A sausage fell into the water!!');
+    }
+    if (!mainWater && state.level[sausage.pos.y][sausage.pos.x] === tile.GRILL) {
+        if (sausage.grilled[2]) {
+            failedLevel('You burnt a sausage!!');
+        }
+        sausage.grilled[2] = true;
+        checkSolved();
+    }
+    if (!verticalWater && sausage.orient === orient.VERTICAL &&
+            state.level[sausage.pos.y + 1][sausage.pos.x] === tile.GRILL) {
+        if (sausage.grilled[3]) {
+            failedLevel('You burnt a sausage!!');
+        }
+        sausage.grilled[3] = true;
+        checkSolved();
+    }
+    if (!horizontalWater && sausage.orient === orient.HORIZONTAL &&
+            state.level[sausage.pos.y][sausage.pos.x + 1] === tile.GRILL) {
+        if (sausage.grilled[3]) {
+            failedLevel('You burnt a sausage!!');
+        }
+        sausage.grilled[3] = true;
+        checkSolved();
     }
 }
 
@@ -359,7 +379,7 @@ function executeMovement(direction) {
     let nextPlayerPos = vectorSum(state.player.pos, nextVector);
 
     if (direction % 2 === state.player.dir % 2) {
-        if (state.level[nextPlayerPos.y][nextPlayerPos.x] === tile.WATER) {
+        if (tileIsWater(nextPlayerPos.x, nextPlayerPos.y)) {
             return;
         }
         if (direction === state.player.dir) {
@@ -404,7 +424,7 @@ function checkSolved() {
 function solvedLevel() {
     failed = true;
     title.textContent = 'You solved the level!!';
-    subtitle.textContent = 'Press R to restart level';
+    subtitle.textContent = 'Try other levels by clicking the arrows below';
 }
 
 function failedLevel(failReason) {
@@ -419,10 +439,47 @@ function unfailedLevel() {
     subtitle.textContent = ogSubtitleText;
 }
 
+function updateLevelButtons() {
+    if (currentLevel === 0) {
+        prevLevelButton.classList.add('button-disabled');
+    } else {
+        prevLevelButton.classList.remove('button-disabled');
+    }
+    if (currentLevel === levels.length - 1) {
+        nextLevelButton.classList.add('button-disabled');
+    } else {
+        nextLevelButton.classList.remove('button-disabled');
+    }
+}
+
+function prevLevel() {
+    if (currentLevel > 0) {
+        currentLevel--;
+        loadCurrentLevel()
+        updateLevelButtons();
+    }
+}
+
+function nextLevel() {
+    if (currentLevel < levels.length - 1) {
+        currentLevel++;
+        loadCurrentLevel()
+        updateLevelButtons();
+    }
+}
+
+function loadCurrentLevel() {
+    levelName.textContent = levels[currentLevel].name;
+    restartLevel();
+}
+
 function restartLevel() {
     unfailedLevel();
     stateStack = [];
-    state = copyState(startState);
+    state = copyState(levels[currentLevel]);
+    for (let sausage of state.sausages) {
+        updateSausage(sausage);
+    }
     redraw();
 }
 
@@ -437,11 +494,15 @@ function undoLastMove() {
 redraw();
 document.onkeyup = function (event) {
     switch (event.code) {
-        case 'KeyA': executeMovement(dir.LEFT);     break;
-        case 'KeyD': executeMovement(dir.RIGHT);    break;
-        case 'KeyW': executeMovement(dir.UP);       break;
-        case 'KeyS': executeMovement(dir.DOWN);     break;
-        case 'KeyR': restartLevel();                break;
-        case 'KeyU': undoLastMove();                break;
+        case 'KeyA':        executeMovement(dir.LEFT);   break;
+        case 'ArrowLeft':   executeMovement(dir.LEFT);   break;
+        case 'KeyD':        executeMovement(dir.RIGHT);  break;
+        case 'ArrowRight':  executeMovement(dir.RIGHT);  break;
+        case 'KeyW':        executeMovement(dir.UP);     break;
+        case 'ArrowUp':     executeMovement(dir.UP);     break;
+        case 'KeyS':        executeMovement(dir.DOWN);   break;
+        case 'ArrowDown':   executeMovement(dir.DOWN);   break;
+        case 'KeyR':        restartLevel();              break;
+        case 'KeyU':        undoLastMove();              break;
     }
 }

@@ -8,15 +8,20 @@
 	<link href="style.css" rel="stylesheet" type="text/css" />
 </head>
 
-<body>
+<body id="body">
 	<div class="header">
 		<div id="title" class="huge bold">Stephen's Sausage Clone</div>
 		<div id="subtitle" class="large">By marcelurpi</div>
+		<div style="width: 1px; height: 40px"></div>
+		<div class="row">
+			<div id="prev-level" class="button large bold"><</div>
+			<div id="level-name" class="level-name large bold">Level 1</div>
+			<div id="next-level" class="button large bold">></div>
+		</div>
 	</div>
-	<canvas id="canvas" width="1000" height="600"></canvas>
-	<script src="script.js">
-
-	</script>
+	<canvas id="canvas" class="canvas"></canvas>
+	<script src="levels.js"></script>
+	<script src="script.js"></script>
 </body>
 
 </html>
