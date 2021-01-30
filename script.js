@@ -23,9 +23,8 @@ updateLevelButtons();
 var canvas = document.getElementById('canvas');
 var context = canvas.getContext('2d');
 
-loadCurrentLevel();
 resizeCanvas();
-updateSizeAttributes();
+loadCurrentLevel();
 
 document.getElementById('body').onresize = function() {
     resizeCanvas();
@@ -471,6 +470,8 @@ function nextLevel() {
 function loadCurrentLevel() {
     levelName.textContent = levels[currentLevel].name;
     restartLevel();
+    updateSizeAttributes();
+    redraw();
 }
 
 function restartLevel() {
