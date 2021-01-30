@@ -94,9 +94,19 @@ function tileIsWater(x, y) {
 }
 
 function drawDirt(x, y) {
-
     context.fillStyle = '#b3634d';
     context.strokeStyle = '#6b3f44';
+    context.lineWidth = lineWidth;
+
+    let worldPosition = tileToWorldPos(x, y);
+    let screenPosition = worldToScreenPos(worldPosition);
+    context.fillRect(screenPosition.x, screenPosition.y, tileSize, tileSize);
+    context.strokeRect(screenPosition.x, screenPosition.y, tileSize, tileSize);
+}
+
+function drawGrass(x, y) {
+    context.fillStyle = '#867f3c';
+    context.strokeStyle = '#404227';
     context.lineWidth = lineWidth;
 
     let worldPosition = tileToWorldPos(x, y);
@@ -283,6 +293,7 @@ function redraw() {
         for (let j = 0; j < state.level[0].length; j++) {
             switch (state.level[i][j]) {
                 case tile.DIRT:     drawDirt(j, i);     break;
+                case tile.GRASS:    drawGrass(j, i);     break;
                 case tile.GRILL:    drawGrill(j, i);    break;
                 case tile.WATER:                        break;
             }
@@ -387,7 +398,7 @@ function executeMovement(direction) {
         } else {
             pushSausages(nextPlayerPos, nextVector, stateChanged);
         }
-        if (state.level[nextPlayerPos.y][nextPlayerPos.x] === tile.DIRT) {
+        if (state.level[nextPlayerPos.y][nextPlayerPos.x] !== tile.GRILL) {
             state.player.pos = nextPlayerPos;
             stateChanged.changed = true;
         }
