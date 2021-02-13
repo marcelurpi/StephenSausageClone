@@ -113,6 +113,7 @@ var levels = [
 for (let level of levels) {
     level.sausages = level.sausages.map(function(sausage) {
         sausage.grilled = [ false, false, false, false ];
+        sausage.burnt = [ false, false ]
         return sausage;
     });
 }

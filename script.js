@@ -142,7 +142,7 @@ function drawGrill(x, y) {
     }
 }
 
-function drawSausage(x, y, orientation, grilled) {
+function drawSausage(x, y, orientation, grilled, burnt) {
     let worldPosition = tileToWorldPos(x, y);
     let screenPosition = worldToScreenPos(worldPosition);
     screenPosition = {
@@ -154,16 +154,20 @@ function drawSausage(x, y, orientation, grilled) {
         screenPosition.w = tileSize - 2 * sausagePadding;
         screenPosition.h = 2 * tileSize + tileMargin - 2 * sausagePadding;
         context.fillStyle = grilled[2] ? '#5c0f00' : '#a13126';
+        context.fillStyle = burnt[0] ? '#220601' : context.fillStyle;
         context.fillRect(screenPosition.x, screenPosition.y, screenPosition.w, (screenPosition.h / 2) * 1.01);
         context.fillStyle = grilled[3] ? '#5c0f00' : '#a13126';
+        context.fillStyle = burnt[1] ? '#220601' : context.fillStyle;
         context.fillRect(screenPosition.x, screenPosition.y + screenPosition.h / 2,
             screenPosition.w, screenPosition.h / 2);
     } else {
         screenPosition.w = 2 * tileSize + tileMargin - 2 * sausagePadding;
         screenPosition.h = tileSize - 2 * sausagePadding;
         context.fillStyle = grilled[2] ? '#5c0f00' : '#a13126';
+        context.fillStyle = burnt[0] ? '#220601' : context.fillStyle;
         context.fillRect(screenPosition.x, screenPosition.y, (screenPosition.w / 2) * 1.01, screenPosition.h);
         context.fillStyle = grilled[3] ? '#5c0f00' : '#a13126';
+        context.fillStyle = burnt[1] ? '#220601' : context.fillStyle;
         context.fillRect(screenPosition.x + screenPosition.w / 2, screenPosition.y,
             screenPosition.w / 2, screenPosition.h);
     }
@@ -276,6 +280,7 @@ function copyState(fromState) {
         toState.sausages.push({
             orient: sausage.orient, pos: { x: sausage.pos.x, y: sausage.pos.y },
             grilled: [...sausage.grilled],
+            burnt: [...sausage.burnt],
         });
     }
     toState.player = {
@@ -300,7 +305,7 @@ function redraw() {
         }
     }
     for (let sausage of state.sausages) {
-        drawSausage(sausage.pos.x, sausage.pos.y, sausage.orient, sausage.grilled);
+        drawSausage(sausage.pos.x, sausage.pos.y, sausage.orient, sausage.grilled, sausage.burnt);
     }
     drawPlayer(state.player.pos.x, state.player.pos.y, state.player.dir);
 }
@@ -334,6 +339,13 @@ function pushSausages(position, pushVector, stateChanged) {
                 sausage.grilled[1] = sausage.grilled[3];
                 sausage.grilled[3] = temp;
                 pushSausages(nextSausagePos, pushVector, stateChanged);
+                if (sausage.orient === orient.VERTICAL) {
+                    let nextSausagePosSec = vectorSum(nextSausagePos, {x: 0, y: 1});
+                    pushSausages(nextSausagePosSec, pushVector, stateChanged);
+                } else {
+                    let nextSausagePosSec = vectorSum(nextSausagePos, {x: 1, y: 0});
+                    pushSausages(nextSausagePosSec, pushVector, stateChanged);
+                }
             } else {
                 let nextPushPos = vectorSum(nextSausagePos, pushVector);
                 pushSausages(nextPushPos, pushVector, stateChanged);
@@ -352,29 +364,38 @@ function updateSausage(sausage) {
         tileIsWater(sausage.pos.x + 1, sausage.pos.y);
     if (mainWater && (verticalWater || horizontalWater)) {
         failedLevel('A sausage fell into the water!!');
+        return;
     }
+    let atLeastOneBurnt = false;
     if (!mainWater && state.level[sausage.pos.y][sausage.pos.x] === tile.GRILL) {
         if (sausage.grilled[2]) {
             failedLevel('You burnt a sausage!!');
+            sausage.burnt[0] = true;
+            atLeastOneBurnt = true;
+        } else if (!atLeastOneBurnt) {
+            sausage.grilled[2] = true;
+            checkSolved();
         }
-        sausage.grilled[2] = true;
-        checkSolved();
     }
     if (!verticalWater && sausage.orient === orient.VERTICAL &&
             state.level[sausage.pos.y + 1][sausage.pos.x] === tile.GRILL) {
         if (sausage.grilled[3]) {
             failedLevel('You burnt a sausage!!');
+            sausage.burnt[1] = true;
+        } else if (!atLeastOneBurnt) {
+            sausage.grilled[3] = true;
+            checkSolved();
         }
-        sausage.grilled[3] = true;
-        checkSolved();
     }
     if (!horizontalWater && sausage.orient === orient.HORIZONTAL &&
             state.level[sausage.pos.y][sausage.pos.x + 1] === tile.GRILL) {
         if (sausage.grilled[3]) {
             failedLevel('You burnt a sausage!!');
+            sausage.burnt[1] = true;
+        } else if (!atLeastOneBurnt) {
+            sausage.grilled[3] = true;
+            checkSolved();
         }
-        sausage.grilled[3] = true;
-        checkSolved();
     }
 }
 
@@ -414,7 +435,7 @@ function executeMovement(direction) {
         state.player.dir = direction;
         stateChanged.changed = true;
     }
-    if (stateChanged) {
+    if (stateChanged.changed) {
         stateStack.push(stateBefore);
         redraw();
     }
