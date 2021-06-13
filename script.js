@@ -10,11 +10,17 @@ var ogTitleText = title.textContent;
 var subtitle = document.getElementById('subtitle');
 var ogSubtitleText = subtitle.textContent;
 
+var firstLevelButton = document.getElementById('first-level');
+firstLevelButton.onclick = firstLevel;
+
 var prevLevelButton = document.getElementById('prev-level');
 prevLevelButton.onclick = prevLevel;
 
 var nextLevelButton = document.getElementById('next-level');
 nextLevelButton.onclick = nextLevel;
+
+var lastLevelButton = document.getElementById('last-level');
+lastLevelButton.onclick = lastLevel;
 
 var levelName = document.getElementById('level-name');
 
@@ -472,14 +478,26 @@ function unfailedLevel() {
 
 function updateLevelButtons() {
     if (currentLevel === 0) {
+        firstLevelButton.classList.add('button-disabled');
         prevLevelButton.classList.add('button-disabled');
     } else {
+        firstLevelButton.classList.remove('button-disabled');
         prevLevelButton.classList.remove('button-disabled');
     }
     if (currentLevel === levels.length - 1) {
         nextLevelButton.classList.add('button-disabled');
+        lastLevelButton.classList.add('button-disabled');
     } else {
         nextLevelButton.classList.remove('button-disabled');
+        lastLevelButton.classList.remove('button-disabled');
+    }
+}
+
+function firstLevel() {
+    if (currentLevel > 0) {
+        currentLevel = 0;
+        loadCurrentLevel()
+        updateLevelButtons();
     }
 }
 
@@ -499,8 +517,17 @@ function nextLevel() {
     }
 }
 
+function lastLevel() {
+    if (currentLevel < levels.length - 1) {
+        currentLevel = levels.length - 1;
+        loadCurrentLevel()
+        updateLevelButtons();
+    }
+}
+
 function loadCurrentLevel() {
-    levelName.textContent = levels[currentLevel].name;
+    levelName.textContent = 'Lvl ' + (currentLevel + 1) + '/' + levels.length
+        + ': ' + levels[currentLevel].name;
     restartLevel();
     updateSizeAttributes();
     redraw();
