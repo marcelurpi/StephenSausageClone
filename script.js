@@ -353,8 +353,13 @@ function pushSausages(position, pushVector, stateChanged) {
                     pushSausages(nextSausagePosSec, pushVector, stateChanged);
                 }
             } else {
-                let nextPushPos = vectorSum(nextSausagePos, pushVector);
-                pushSausages(nextPushPos, pushVector, stateChanged);
+                if (sausage.pos.x === position.x && sausage.pos.y === position.y) {
+					let nextPushPos = vectorSum(nextSausagePos, pushVector);
+					pushSausages(nextPushPos, pushVector, stateChanged);
+				} else {
+					pushSausages(nextSausagePos, pushVector, stateChanged);
+				}
+                
             }
             sausage.pos = nextSausagePos;
             updateSausage(sausage);
